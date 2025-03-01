@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Открытая парковка</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+
+        body {
+            background-color: #f5f5f5;
+            min-height: 100vh;
+        }
+
+        /* Стили главной страницы */
+        #mainPage {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            text-align: center;
+            padding: 20px;
+            animation: fadeIn 1s ease-in;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        p {
+            font-size: 1.2rem;
+            color: #666;
+            margin-bottom: 40px;
+        }
+
+        .start-button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 1.1rem;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        /* Стили страницы с картой */
+        #mapPage {
+            display: none;
+            height: 100vh;
+            width: 100%;
+            position: relative;
+        }
+
+        #map {
+            height: 100%;
+            width: 100%;
+        }
+
+        .back-button {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            padding: 10px 20px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            z-index: 1000;
+        }
+
+        .comment-form {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.2);
+            z-index: 1000;
+            display: none;
+            width: 90%;
+            max-width: 400px;
+        }
+
+        .comment-input {
+            width: 100%;
+            height: 100px;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            resize: vertical;
+        }
+
+        .submit-button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            width: 100%;
+            font-size: 16px;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2rem;
+            }
+            
+            p {
+                font-size: 1rem;
+            }
+            
+            .start-button {
+                padding: 12px 30px;
+                font-size: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Главная страница -->
+    <div id="mainPage">
+        <h1>Открытая парковка</h1>
+        <p>Здесь можно найти парковку</p>
+        <button class="start-button" onclick="showMap()">Начать использовать</button>
+    </div>
+
+    <!-- Страница с картой -->
+    <div id="mapPage">
+        <button class="back-button" onclick="showMain()">Назад</button>
+        <div id="map"></div>
+        <div class="comment-form" id="commentForm">
+            <textarea class="comment-input" placeholder="Оставьте ваш комментарий..."></textarea>
+            <button class="submit-button" onclick="saveComment()">Сохранить комментарий</button>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script>
+        let map;
+        let markers = [];
+        let selectedCoords = null;
+
+        function showMap() {
+            document.getElementById('mainPage').style.display = 'none';
+            document.getElementById('mapPage').style.display = 'block';
+            
+            if(!map) {
+                initMap();
+            }
+        }
+
+        function showMain() {
+            document.getElementById('mapPage').style.display = 'none';
+            document.getElementById('mainPage').style.display = 'flex';
+        }
+
+        function initMap() {
+            // Инициализация карты (замените координаты на нужные)
+            map = L.map('map').setView([60.076176, 30.410835], 15);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+
+            // Загрузка сохраненных комментариев
+            loadComments();
+
+            // Обработчик клика по карте
+            map.on('click', function(e) {
+                selectedCoords = e.latlng;
+                document.getElementById('commentForm').style.display = 'block';
+            });
+        }
+
+        function saveComment() {
+            const commentText = document.querySelector('.comment-input').value.trim();
+            if(!commentText || !selectedCoords) return;
+
+            // Создание маркера
+            const marker = L.marker(selectedCoords).addTo(map);
+            marker.bindPopup(`<div class="marker-popup">${commentText}</div>`);
+            
+            // Сохранение в localStorage
+            const comment = {
+                lat: selectedCoords.lat,
+                lng: selectedCoords.lng,
+                text: commentText,
+                date: new Date().toISOString()
+            };
+            
+            markers.push(comment);
+            localStorage.setItem('parkingComments', JSON.stringify(markers));
+
+            // Сброс формы
+            document.querySelector('.comment-input').value = '';
+            document.getElementById('commentForm').style.display = 'none';
+            selectedCoords = null;
+        }
+
+        function loadComments() {
+            const savedComments = JSON.parse(localStorage.getItem('parkingComments')) || [];
+            markers = savedComments;
+            
+            savedComments.forEach(comment => {
+                const marker = L.marker([comment.lat, comment.lng]).addTo(map);
+                marker.bindPopup(`<div class="marker-popup">${comment.text}</div>`);
+            });
+        }
+    </script>
+</body>
+</html>
